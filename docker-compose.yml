@@ -1,0 +1,62 @@
+version: '3.9'
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # FastAPI — ingestion + RAG query microservice
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: doc-intelligence-api
+    ports:
+      - "8000:8000"
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      PINECONE_ENVIRONMENT: ${PINECONE_ENVIRONMENT}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME:-doc-intelligence}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      VECTOR_STORE: ${VECTOR_STORE:-pinecone}
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.75}
+      CHUNK_SIZE: ${CHUNK_SIZE:-512}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-64}
+      TOP_K: ${TOP_K:-5}
+      CHAT_HISTORY_WINDOW: ${CHAT_HISTORY_WINDOW:-4}
+      OPENAI_MODEL: ${OPENAI_MODEL:-openai/gpt-oss-20b}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.groq.com/openai/v1}
+    volumes:
+      - chroma_data:/app/chroma_data     # Persist Chroma index (dev mode)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Next.js — frontend + BFF API routes
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: doc-intelligence-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      FASTAPI_URL: http://api:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-documents}
+      CHAT_HISTORY_WINDOW: ${CHAT_HISTORY_WINDOW:-4}
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  chroma_data:

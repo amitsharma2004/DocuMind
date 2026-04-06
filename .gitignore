@@ -1,0 +1,37 @@
+# Environment files — never commit
+.env
+.env.local
+.env.*.local
+frontend/.env.local
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+
+# Python build artifacts
+*.egg-info/
+dist/
+build/
+
+# Chroma local data
+api/chroma_data/
+
+# Logs
+logs/
+*.log
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
