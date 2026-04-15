@@ -13,7 +13,8 @@ from openai import AsyncOpenAI, APITimeoutError
 
 from api.models import QueryRequest, QueryResponse, ChatMessage
 from api.services.retriever import retrieve_chunks
-from api.services.guard import apply_confidence_guard, I_DONT_KNOW
+from api.services.reranker import rerank_chunks
+from api.services.guard import apply_confidence_guard, has_any_context, I_DONT_KNOW
 from api.services.prompt_builder import build_messages
 from api.services.citation_builder import build_citations
 from api.config import get_settings
@@ -41,12 +42,13 @@ async def query_documents(
     window_size = settings.chat_history_window * 2
     windowed_history = request.chat_history[-window_size:]
 
-    # --- Retrieve ---
+    # --- Retrieve top-15 candidates ---
     try:
-        chunks = await retrieve_chunks(
+        candidates = await retrieve_chunks(
             query=request.query,
             namespace=request.namespace,
-            top_k=request.top_k,
+            top_k=15,                      # fetch more for reranker
+            filter_doc_ids=request.filter_doc_ids,
         )
     except Exception as e:
         logger.error("Retrieval failed: %s", e)
@@ -55,10 +57,15 @@ async def query_documents(
             detail={"error": "Retrieval failed.", "code": "VECTORSTORE_ERROR"},
         )
 
+    # --- BGE Rerank: top-15 → top-5 (disabled due to disk space) ---
+    # Use vector scores directly for faster response
+    chunks = sorted(candidates, key=lambda c: c.score, reverse=True)[:request.top_k]
+
     # --- Confidence guard ---
     is_grounded, max_score = apply_confidence_guard(chunks)
 
-    if not is_grounded:
+    # Truly no context — return fallback immediately
+    if not is_grounded and not has_any_context(chunks):
         return QueryResponse(
             answer=I_DONT_KNOW,
             confidence=round(max_score, 4),
@@ -66,11 +73,15 @@ async def query_documents(
             citations=[],
         )
 
-    # --- Build prompt and call LLM (OpenAI-compatible endpoint) ---
+    # Low confidence but some context — use warning prompt
+    use_warning = not is_grounded
+
+    # --- Build prompt and call LLM ---
     messages = build_messages(
         query=request.query,
         chunks=chunks,
         history=windowed_history,
+        use_warning_prompt=use_warning,
     )
 
     try:
@@ -86,6 +97,24 @@ async def query_documents(
             max_tokens=1024,
         )
         answer = completion.choices[0].message.content or I_DONT_KNOW
+
+        # --- Log token usage ---
+        usage = completion.usage
+        if usage:
+            prompt_tokens = usage.prompt_tokens
+            completion_tokens = usage.completion_tokens
+            total_tokens = usage.total_tokens
+            # Cost estimates (Groq gpt-oss-20b is free, but log for reference)
+            # Claude 3 Haiku rates: $0.25/1M input, $1.25/1M output
+            input_cost  = (prompt_tokens / 1_000_000) * 0.25
+            output_cost = (completion_tokens / 1_000_000) * 1.25
+            logger.info(
+                "TOKEN USAGE | input=%d output=%d total=%d | "
+                "est_cost(Haiku)=$%.6f | model=%s",
+                prompt_tokens, completion_tokens, total_tokens,
+                input_cost + output_cost,
+                settings.openai_model,
+            )
 
     except APITimeoutError:
         logger.error("LLM timeout (model=%s) for query='%.60s'", settings.openai_model, request.query)
@@ -106,6 +135,6 @@ async def query_documents(
     return QueryResponse(
         answer=answer,
         confidence=round(max_score, 4),
-        is_grounded=True,
+        is_grounded=is_grounded,
         citations=citations,
     )

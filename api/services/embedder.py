@@ -18,7 +18,7 @@ from api.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = "models/text-embedding-004"
+EMBEDDING_MODEL = "models/gemini-embedding-001"
 EMBEDDING_DIMENSIONS = 768
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 1.0  # seconds
@@ -43,6 +43,7 @@ def _embed_sync(text: str) -> List[float]:
                 model=EMBEDDING_MODEL,
                 content=text,
                 task_type="retrieval_document",
+                output_dimensionality=EMBEDDING_DIMENSIONS,
             )
             embedding: List[float] = result["embedding"]
             if len(embedding) != EMBEDDING_DIMENSIONS:
@@ -74,6 +75,7 @@ def _embed_query_sync(text: str) -> List[float]:
                 model=EMBEDDING_MODEL,
                 content=text,
                 task_type="retrieval_query",
+                output_dimensionality=EMBEDDING_DIMENSIONS,
             )
             return result["embedding"]
         except Exception as e:

@@ -26,5 +26,8 @@ python-docx==1.1.2      # DOCX: section heading extraction
 # Chunking
 langchain-text-splitters==0.3.0
 
+# Reranking
+sentence-transformers>=3.0.0
+
 # Async HTTP (used for bounded Gemini calls if needed)
 httpx==0.27.2

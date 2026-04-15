@@ -29,6 +29,20 @@ Rules:
 {context}
 --- END CONTEXT ---"""
 
+WARNING_PROMPT_TEMPLATE = """You are given a question and some retrieved context.
+The context may not fully answer the question.
+
+Instructions:
+- Use ONLY the context below
+- If partial info is available, answer partially
+- Mention uncertainty clearly
+- Do NOT hallucinate
+- At the end, add: Confidence: High / Medium / Low
+
+--- DOCUMENT CONTEXT ---
+{context}
+--- END CONTEXT ---"""
+
 
 def _format_chunk_citation(chunk: ScoredChunk) -> str:
     """Format the source label for a chunk."""
@@ -44,36 +58,29 @@ def build_messages(
     query: str,
     chunks: List[ScoredChunk],
     history: List[ChatMessage],
+    use_warning_prompt: bool = False,
 ) -> List[dict]:
-    """
-    Build the OpenAI messages array for the chat completion call.
+    # Filter out low-quality chunks before sending to LLM
+    # Normal mode: only chunks above 0.5, Warning mode: above 0.25
+    score_cutoff = 0.25 if use_warning_prompt else 0.5
+    filtered_chunks = [c for c in chunks if c.score >= score_cutoff] or chunks[:2]
 
-    Args:
-        query:   Current user question.
-        chunks:  Retrieved context chunks (already confidence-guarded).
-        history: Last N chat turns (role + content pairs).
-
-    Returns:
-        List of message dicts in OpenAI chat format.
-    """
-    # Build context string from retrieved chunks
     context_parts = []
-    for i, chunk in enumerate(chunks, start=1):
+    for i, chunk in enumerate(filtered_chunks, start=1):
         citation = _format_chunk_citation(chunk)
         context_parts.append(
             f"[Excerpt {i} | Score: {chunk.score:.2f}] {citation}\n{chunk.text}"
         )
     context = "\n\n".join(context_parts)
 
-    system_content = SYSTEM_PROMPT_TEMPLATE.format(context=context)
+    template = WARNING_PROMPT_TEMPLATE if use_warning_prompt else SYSTEM_PROMPT_TEMPLATE
+    system_content = template.format(context=context)
 
     messages: List[dict] = [{"role": "system", "content": system_content}]
 
-    # Inject chat history (last N turns, already windowed by the caller)
     for msg in history:
         messages.append({"role": msg.role.value, "content": msg.content})
 
-    # Current question
     messages.append({"role": "user", "content": query})
 
     return messages

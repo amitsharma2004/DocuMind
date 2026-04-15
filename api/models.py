@@ -61,11 +61,30 @@ class QueryRequest(BaseModel):
     query: str = Field(..., max_length=1000, description="Natural language question")
     namespace: str = Field(..., description="Pinecone namespace (user/session ID)")
     top_k: int = Field(default=5, ge=1, le=20)
+    filter_doc_ids: Optional[List[str]] = Field(
+        default=None,
+        description="Restrict search to these doc_ids only (None = search all)",
+    )
     chat_history: List[ChatMessage] = Field(
         default_factory=list,
         max_length=8,
         description="Last N turns of conversation (max 4 turns = 8 messages)",
     )
+
+
+class FlashcardRequest(BaseModel):
+    namespace: str
+    doc_ids: Optional[List[str]] = None   # None = all docs in namespace
+    count: int = Field(default=10, ge=1, le=20)
+
+
+class Flashcard(BaseModel):
+    question: str
+    answer: str
+
+
+class FlashcardResponse(BaseModel):
+    cards: List[Flashcard]
 
 
 class Citation(BaseModel):

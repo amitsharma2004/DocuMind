@@ -17,22 +17,19 @@ logger = logging.getLogger(__name__)
 
 I_DONT_KNOW = "I don't know based on the provided documents."
 
+# Below this score even warning prompt won't fire — truly no relevant context
+NO_CONTEXT_THRESHOLD = 0.3
+
 
 def apply_confidence_guard(
     chunks: List[ScoredChunk],
     threshold: float | None = None,
 ) -> Tuple[bool, float]:
     """
-    Evaluate whether retrieved chunks meet the confidence threshold.
-
-    Args:
-        chunks:    Chunks from the retriever, sorted by score descending.
-        threshold: Override the default threshold (from config).
-
     Returns:
         (is_grounded, max_score)
-        - is_grounded=True  → proceed to LLM
-        - is_grounded=False → return I_DONT_KNOW, skip LLM
+        - is_grounded=True  → high confidence, proceed to normal LLM
+        - is_grounded=False → low/no confidence
     """
     settings = get_settings()
     effective_threshold = threshold if threshold is not None else settings.confidence_threshold
@@ -46,7 +43,7 @@ def apply_confidence_guard(
     is_grounded = max_score >= effective_threshold
     if not is_grounded:
         logger.info(
-            "Guard fired: max_score=%.4f < threshold=%.2f — returning I don't know",
+            "Guard fired: max_score=%.4f < threshold=%.2f — using warning prompt",
             max_score,
             effective_threshold,
         )
@@ -58,3 +55,10 @@ def apply_confidence_guard(
         )
 
     return is_grounded, max_score
+
+
+def has_any_context(chunks: List[ScoredChunk]) -> bool:
+    """True if there's at least some weak context worth sending to LLM with warning prompt."""
+    if not chunks:
+        return False
+    return max(c.score for c in chunks) >= NO_CONTEXT_THRESHOLD

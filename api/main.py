@@ -15,7 +15,7 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import ingest, query, documents
+from api.routers import ingest, query, documents, flashcards
 import api.vectorstore as vectorstore
 from api.services.embedder import _configure_client as configure_gemini
 from api.models import HealthResponse
@@ -60,6 +60,7 @@ app.add_middleware(
 app.include_router(ingest.router, tags=["Ingestion"])
 app.include_router(query.router, tags=["Query"])
 app.include_router(documents.router, tags=["Documents"])
+app.include_router(flashcards.router, tags=["Flashcards"])
 
 
 # ---------------------------------------------------------------------------

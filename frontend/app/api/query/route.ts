@@ -14,14 +14,14 @@ const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY ?? '';
 const CHAT_HISTORY_WINDOW = parseInt(process.env.CHAT_HISTORY_WINDOW ?? '4', 10);
 
 export async function POST(req: NextRequest) {
-  let body: { query: string; namespace: string; session_id: string; top_k?: number };
+  let body: { query: string; namespace: string; session_id: string; top_k?: number; filter_doc_ids?: string[] };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
-  const { query, namespace, session_id, top_k } = body;
+  const { query, namespace, session_id, top_k, filter_doc_ids } = body;
   if (!query?.trim()) return NextResponse.json({ error: 'query is required.' }, { status: 400 });
   if (!namespace) return NextResponse.json({ error: 'namespace is required.' }, { status: 400 });
   if (!session_id) return NextResponse.json({ error: 'session_id is required.' }, { status: 400 });
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
         query,
         namespace,
         top_k: top_k ?? 5,
+        filter_doc_ids: filter_doc_ids ?? null,
         chat_history: chatHistory,
       }),
     });

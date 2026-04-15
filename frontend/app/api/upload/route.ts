@@ -57,12 +57,20 @@ export async function POST(req: NextRequest) {
   const docId = uuidv4();
   const fileBuffer = Buffer.from(await file.arrayBuffer());
 
+  // Sanitize filename — remove emojis and special chars not allowed by Supabase Storage
+  const safeFilename = file.name
+    .replace(/[^\x00-\x7F]/g, '')   // remove non-ASCII (emojis, etc.)
+    .replace(/[^a-zA-Z0-9._\-\s]/g, '') // remove remaining special chars
+    .trim()
+    .replace(/\s+/g, '_')           // spaces → underscores
+    || `file_${docId}`;             // fallback if name becomes empty
+
   // --- Upload to Supabase Storage ---
   let storagePath: string;
   try {
     storagePath = await uploadFile({
       fileBuffer,
-      filename: file.name,
+      filename: safeFilename,
       mimeType: file.type,
       namespace,
       docId,
