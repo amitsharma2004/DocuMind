@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     # --- OpenAI (LLM only) ---
     openai_api_key: str = ""
+    bedrock_api_key: str = ""
 
     # --- Pinecone ---
     pinecone_api_key: str = ""

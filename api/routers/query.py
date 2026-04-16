@@ -7,6 +7,7 @@ If guard fires (max score < threshold), returns is_grounded=false with no LLM ca
 from __future__ import annotations
 
 import logging
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from openai import AsyncOpenAI, APITimeoutError
@@ -57,12 +58,8 @@ async def query_documents(
             detail={"error": "Retrieval failed.", "code": "VECTORSTORE_ERROR"},
         )
 
-    # --- BGE Rerank: top-15 → top-5 ---
-    try:
-        chunks = await rerank_chunks(query=request.query, chunks=candidates, top_n=request.top_k)
-    except Exception as e:
-        logger.warning("Reranking failed, falling back to vector scores: %s", e)
-        chunks = sorted(candidates, key=lambda c: c.score, reverse=True)[:request.top_k]
+    # --- Rerank disabled: use vector scores directly ---
+    chunks = sorted(candidates, key=lambda c: c.score, reverse=True)[:request.top_k]
 
     # --- Confidence guard ---
     is_grounded, max_score = apply_confidence_guard(chunks)
@@ -100,6 +97,12 @@ async def query_documents(
             max_tokens=1024,
         )
         answer = completion.choices[0].message.content or I_DONT_KNOW
+
+        # Strip reasoning tags - handles multiline and unclosed tags
+        answer = re.sub(r'<reasoning>[\s\S]*?</reasoning>\s*', '', answer).strip()
+        answer = re.sub(r'<reasoning>[\s\S]*$', '', answer).strip()
+        if not answer:
+            answer = I_DONT_KNOW
 
         # --- Log token usage ---
         usage = completion.usage

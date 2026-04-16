@@ -117,6 +117,10 @@ async def generate_mindmap(
         )
         raw = completion.choices[0].message.content or "{}"
 
+        # Strip reasoning tags
+        import re
+        raw = re.sub(r'<reasoning>.*?</reasoning>', '', raw, flags=re.DOTALL).strip()
+
         # Parse JSON
         raw = raw.strip()
         if raw.startswith("```"):
