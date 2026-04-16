@@ -7,6 +7,8 @@ import remarkGfm from 'remark-gfm';
 import { UIMessage, QueryResponse } from '@/types';
 import CitationCard from './CitationCard';
 import ConfidenceBadge from './ConfidenceBadge';
+import MindmapView from './MindmapView';
+import { SendIcon, MenuIcon, SunIcon, MoonIcon, BrainIcon, ChevronDownIcon, ChevronUpIcon } from './Icons';
 
 interface ChatWindowProps {
   namespace: string;
@@ -19,6 +21,8 @@ export default function ChatWindow({ namespace, filterDocIds }: ChatWindowProps)
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(() => uuidv4());
   const [expandedCitations, setExpandedCitations] = useState<Set<string>>(new Set());
+  const [showMindmap, setShowMindmap] = useState(false);
+  const [mindmapQuery, setMindmapQuery] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -209,6 +213,19 @@ export default function ChatWindow({ namespace, filterDocIds }: ChatWindowProps)
             disabled={isLoading}
           />
           <button
+            onClick={() => {
+              setMindmapQuery(input.trim() || 'main topics');
+              setShowMindmap(true);
+            }}
+            disabled={isLoading || !input.trim()}
+            className="shrink-0 w-11 h-11 rounded-xl bg-purple-600 hover:bg-purple-700 active:bg-purple-800
+              disabled:opacity-40 disabled:cursor-not-allowed transition-colors
+              flex items-center justify-center text-white"
+            title="Generate mind map"
+          >
+            <div className="w-5 h-5"><BrainIcon /></div>
+          </button>
+          <button
             onClick={sendMessage}
             disabled={isLoading || !input.trim()}
             className="shrink-0 w-11 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800
@@ -216,18 +233,26 @@ export default function ChatWindow({ namespace, filterDocIds }: ChatWindowProps)
               flex items-center justify-center text-white"
           >
             {isLoading ? (
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 animate-spin"><SendIcon /></div>
             ) : (
-              <svg className="w-4 h-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
+              <div className="w-4 h-4 rotate-90"><SendIcon /></div>
             )}
           </button>
         </div>
         <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-2 text-center">
-          Enter to send · Shift+Enter for newline · Answers grounded in your documents
+          Enter to send · Shift+Enter for newline · 🧠 for mind map · Answers grounded in your documents
         </p>
       </div>
+
+      {/* Mindmap modal */}
+      {showMindmap && (
+        <MindmapView
+          namespace={namespace}
+          query={mindmapQuery}
+          selectedDocIds={filterDocIds}
+          onClose={() => setShowMindmap(false)}
+        />
+      )}
     </div>
   );
 }

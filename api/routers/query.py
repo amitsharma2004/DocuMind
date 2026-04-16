@@ -57,9 +57,12 @@ async def query_documents(
             detail={"error": "Retrieval failed.", "code": "VECTORSTORE_ERROR"},
         )
 
-    # --- BGE Rerank: top-15 → top-5 (disabled due to disk space) ---
-    # Use vector scores directly for faster response
-    chunks = sorted(candidates, key=lambda c: c.score, reverse=True)[:request.top_k]
+    # --- BGE Rerank: top-15 → top-5 ---
+    try:
+        chunks = await rerank_chunks(query=request.query, chunks=candidates, top_n=request.top_k)
+    except Exception as e:
+        logger.warning("Reranking failed, falling back to vector scores: %s", e)
+        chunks = sorted(candidates, key=lambda c: c.score, reverse=True)[:request.top_k]
 
     # --- Confidence guard ---
     is_grounded, max_score = apply_confidence_guard(chunks)
