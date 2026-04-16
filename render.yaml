@@ -8,6 +8,7 @@ services:
     buildCommand: pip install -r api/requirements.txt
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
+    pythonVersion: "3.11"
     envVars:
       - key: GOOGLE_API_KEY
         sync: false
